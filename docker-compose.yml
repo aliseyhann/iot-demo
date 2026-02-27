@@ -1,0 +1,74 @@
+services:
+  # MQTT Broker — message router between sensor and backend
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      iot-net:
+        ipv6_address: fd00:10::10
+
+  # Node.js backend — MQTT subscriber + WebSocket server (bridge)
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      - MQTT_BROKER=mqtt://mosquitto:1883
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    networks:
+      iot-net:
+        ipv6_address: fd00:10::20
+
+  # Contiki-NG native MQTT client (optional)
+  # Start with: docker compose --profile contiki up --build
+  contiki-sensor:
+    build: ./contiki_client
+    profiles: ["contiki"]
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - BROKER_IPV6=fd00:100::1
+      - BROKER_PROXY_TARGET=mosquitto:1883
+      - TUN_PREFIX=fd00:100::1/64
+      - TUN_DEV=tun0
+    sysctls:
+      - net.ipv6.conf.all.forwarding=1
+      - net.ipv6.conf.default.forwarding=1
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    networks:
+      iot-net:
+        ipv6_address: fd00:10::50
+
+  # Nginx — serves the dashboard HTML
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      iot-net:
+        ipv6_address: fd00:10::40
+
+networks:
+  iot-net:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+        - subnet: fd00:10::/64
