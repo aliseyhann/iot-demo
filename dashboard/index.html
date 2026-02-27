@@ -446,8 +446,13 @@ ws.onclose = () => {
             }
         }
 
+        function getWebSocketUrl() {
+            var scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+            return scheme + '://' + window.location.hostname + ':3000';
+        }
+
         function connectWebSocket() {
-            ws = new WebSocket('ws://localhost:3000');
+            ws = new WebSocket(getWebSocketUrl());
 
             ws.onopen = function() {
                 document.getElementById('status-text').textContent = 'Connected';
