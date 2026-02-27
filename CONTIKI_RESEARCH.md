@@ -9,7 +9,9 @@ Integration is complete and running with Contiki-NG as the only publisher.
 - `contiki_client/` added:
   - `Dockerfile`
   - `run-contiki.sh`
-  - `project-conf.h.template`
+  - `src/mqtt-client.c` (custom client)
+  - `src/Makefile`
+  - `src/project-conf.h`
 - `docker-compose.yml` updated:
   - `contiki-sensor` profile/service enabled
   - IPv6-enabled bridge network (`fd00:10::/64`)
@@ -21,24 +23,21 @@ Integration is complete and running with Contiki-NG as the only publisher.
 
 ### Runtime Strategy
 
-- Contiki source is cloned from:
+- Base image:
+  - `contiker/contiki-ng:latest`
+- If Contiki source is missing in image, Dockerfile clones:
   - `https://github.com/contiki-ng/contiki-ng`
-- `examples/mqtt-client` is built with `TARGET=native`.
-- `run-contiki.sh` applies runtime source tweaks before build:
-  - native connectivity fix for Docker
-  - payload fields: `temperature`, `humidity`, `device_id`
-  - publish interval: 2 seconds
+- Custom app (`contiki_client/src/mqtt-client.c`) is built with `TARGET=native`
+  during image build.
+- Runtime patching is removed; behavior is versioned in project source.
 - Local MQTT proxy in contiki container:
   - listens on `fd00:100::1:1883`
   - forwards to `mosquitto:1883`
 
-### Verified Behavior
+### Known Constraint
 
-- Contiki connects to Mosquitto with client id:
-  - `d:quickstart:mqtt-client:010203060708`
-- Backend logs include messages on:
-  - `iot-2/evt/status/fmt/json`
-- Payload reaches dashboard with non-null `temperature`/`humidity`.
+- On Apple Silicon, `contiker/contiki-ng` runs as amd64 emulation.
+  First image build can be slower.
 
 ## Run
 

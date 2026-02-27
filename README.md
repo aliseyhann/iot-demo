@@ -11,7 +11,7 @@ Contiki-NG native MQTT node + Mosquitto + Node.js WebSocket backend + dashboard.
 ## Services
 
 - `mosquitto`: MQTT broker
-- `contiki-sensor`: Contiki-NG native `examples/mqtt-client` (Dockerized)
+- `contiki-sensor`: Custom Contiki-NG native MQTT client (`contiki_client/src/mqtt-client.c`)
 - `backend`: MQTT subscriber + WebSocket broadcaster
 - `dashboard`: static UI
 
@@ -26,12 +26,16 @@ Open: [http://localhost:8080](http://localhost:8080)
 ## Notes
 
 - Python simulator has been removed from this project.
+- `contiki-sensor` image is based on `contiker/contiki-ng`.
+- Contiki source repo is cloned in image build if missing.
+- Native binary is built at image build time (not container startup).
 - Backend subscribes to `iot-2/evt/+/fmt/json`.
 - Contiki payload includes:
   - `temperature`
   - `humidity`
   - `device_id` (`contiki-01`)
 - Contiki publish interval is configured to 2 seconds.
+- On Apple Silicon, first build can take longer due amd64 emulation.
 
 ## Quick Checks
 

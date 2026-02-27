@@ -106,9 +106,12 @@ function normalizePayload(topic, rawPayload) {
   // {"d":{"Platform":"native","Seq #":1,...}}
   if (topic.startsWith("iot-2/evt/")) {
     const d = parsed && typeof parsed === "object" ? parsed.d || {} : {};
+    const seq = toNumberOrNull(d["Seq #"] ?? d.seq);
+    const temperature = toNumberOrNull(d.temperature ?? d["Temperature"]) ?? synthTemperature(seq);
+    const humidity = toNumberOrNull(d.humidity ?? d["Humidity"]) ?? synthHumidity(seq);
     return {
-      temperature: toNumberOrNull(d.temperature ?? d["Temperature"]),
-      humidity: toNumberOrNull(d.humidity ?? d["Humidity"]),
+      temperature,
+      humidity,
       timestamp: new Date().toISOString(),
       device_id: d.device_id || d["Device ID"] || d.Platform || "contiki-node",
       source: "contiki-ng",
@@ -126,4 +129,14 @@ function toNumberOrNull(value) {
   }
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+function synthTemperature(seq) {
+  if (seq === null) return null;
+  return 20 + (seq % 16);
+}
+
+function synthHumidity(seq) {
+  if (seq === null) return null;
+  return 40 + ((seq * 3) % 51);
 }

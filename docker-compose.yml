@@ -39,8 +39,8 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     environment:
-      - BROKER_IPV6=fd00:100::1
       - BROKER_PROXY_TARGET=mosquitto:1883
+      - BROKER_IPV6=fd00:100::1
       - TUN_PREFIX=fd00:100::1/64
       - TUN_DEV=tun0
     sysctls:
