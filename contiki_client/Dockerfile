@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM contiker/contiki-ng:latest
 
 USER root
 
@@ -7,9 +7,9 @@ ENV CONTIKI_DIR=/home/user/contiki-ng
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    ca-certificates \
     git \
     make \
-    ca-certificates \
     net-tools \
     socat \
     iproute2 \
@@ -27,6 +27,7 @@ RUN if [ ! -f "${CONTIKI_DIR}/Makefile.include" ]; then \
 WORKDIR /contiki_client
 
 COPY run-contiki.sh /contiki_client/run-contiki.sh
+COPY project-conf.h.template /contiki_client/project-conf.h.template
 
 RUN chmod +x /contiki_client/run-contiki.sh
 

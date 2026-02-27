@@ -1,0 +1,11 @@
+#ifndef PROJECT_CONF_H_
+#define PROJECT_CONF_H_
+
+#include "os/sys/log.h"
+
+#define UIP_CONF_TCP 1
+#define MQTT_CONF_VERSION MQTT_PROTOCOL_VERSION_3_1_1
+#define MQTT_CLIENT_CONF_BROKER_IP_ADDR "fd00:100::1"
+#define MQTT_CLIENT_CONF_LOG_LEVEL LOG_LEVEL_INFO
+
+#endif /* PROJECT_CONF_H_ */
