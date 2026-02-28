@@ -54,60 +54,100 @@
   </div>
 
   <div id="tab-code" style="display:none;">
-    <div style="max-width: 980px; margin: 0 auto;">
+    <div style="max-width: 1100px; margin: 0 auto;">
       <h2 style="text-align: center;">Code Samples</h2>
       <p style="text-align: center;">
-        This section shows the exact bridge flow from Contiki MQTT messages to browser updates.
+        Full end-to-end flow: <b>Contiki Node -> MQTT Broker -> Backend -> WebSocket -> Frontend UI</b>
       </p>
 
-      <p><b>1) backend/server.js</b> — MQTT Subscriber + WebSocket Bridge</p>
-      <p>
-        Backend subscribes to the Contiki topic, normalizes payload fields, then pushes JSON to all connected
-        WebSocket clients. This is the central real-time bridge.
-      </p>
-<pre>// 1) Read broker address from env (default: local compose broker)
-const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://mosquitto:1883";
+      <div style="display: flex; justify-content: center; gap: 8px; margin: 12px 0;">
+        <button onclick="moveCodeStage(-1)" style="padding: 6px 14px; font-family: inherit; cursor: pointer;">&larr; Prev</button>
+        <span id="code-stage-label" style="display: inline-block; min-width: 230px; text-align: center; line-height: 30px; border: 1px solid #999; padding: 0 8px;">Stage 1 / 5</span>
+        <button onclick="moveCodeStage(1)" style="padding: 6px 14px; font-family: inherit; cursor: pointer;">Next &rarr;</button>
+      </div>
 
-// 2) Subscribe to Contiki event topic pattern
+      <div style="overflow: hidden; border: 1px solid #999; padding: 12px;">
+        <div id="code-stage-track" style="display: flex; width: 100%; transition: transform 0.3s ease;">
+          <section style="flex: 0 0 100%; box-sizing: border-box; padding: 4px 8px;">
+            <h3>Stage 1: Contiki Native Node (Data Producer)</h3>
+            <p>
+              Contiki native process runs in Docker with TUN interface and publishes telemetry every 2 seconds to
+              <code>iot-2/evt/status/fmt/json</code>.
+            </p>
+<pre># run-contiki.sh (startup path)
+CCACHE_DISABLE=1 make -C "${EXAMPLE_DIR}" TARGET=native clean all
+exec "${EXAMPLE_DIR}/build/native/mqtt-client.native" --prefix "${TUN_PREFIX}" -t "${TUN_DEV}"
+
+// mqtt-client.c (publish intent)
+mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer,
+             strlen(app_buffer), MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF);</pre>
+          </section>
+
+          <section style="flex: 0 0 100%; box-sizing: border-box; padding: 4px 8px;">
+            <h3>Stage 2: Mosquitto Broker (Message Router)</h3>
+            <p>
+              Broker receives publish packets from Contiki client and routes them to subscribers matching the topic.
+              Publisher and subscriber are decoupled.
+            </p>
+<pre># compose
+mosquitto:
+  image: eclipse-mosquitto:2
+  ports:
+    - "1883:1883"
+
+# expected broker log
+New client connected ... as d:quickstart:mqtt-client:010203060708</pre>
+          </section>
+
+          <section style="flex: 0 0 100%; box-sizing: border-box; padding: 4px 8px;">
+            <h3>Stage 3: Backend MQTT Subscriber (Normalization)</h3>
+            <p>
+              Node backend subscribes to Contiki topic, parses payload, derives normalized fields
+              (<code>temperature</code>, <code>humidity</code>, <code>device_id</code>) and prepares one unified JSON.
+            </p>
+<pre>const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://mosquitto:1883";
 mqttClient.subscribe("iot-2/evt/+/fmt/json");
 
-// 3) On every MQTT message, broadcast normalized payload to all WS clients
-wss.clients.forEach((client) =&gt; {
+// on message -> normalize
+const payload = normalizePayload(topic, message.toString());</pre>
+          </section>
+
+          <section style="flex: 0 0 100%; box-sizing: border-box; padding: 4px 8px;">
+            <h3>Stage 4: Backend WebSocket Broadcast (Bridge)</h3>
+            <p>
+              Backend acts as bridge: every normalized MQTT event is pushed to all active browser clients over
+              persistent WebSocket connections.
+            </p>
+<pre>const { WebSocketServer } = require("ws");
+const wss = new WebSocketServer({ port: 3000 });
+
+wss.clients.forEach((client) => {
   if (client.readyState === 1) {
     client.send(JSON.stringify(payload));
   }
 });</pre>
+          </section>
 
-      <p><b>2) dashboard/index.html</b> — WebSocket Client</p>
-      <p>
-        Frontend builds the WebSocket URL from the current hostname, so the same page works on localhost and VPS.
-        Incoming data is parsed and inserted into the live table.
-      </p>
+          <section style="flex: 0 0 100%; box-sizing: border-box; padding: 4px 8px;">
+            <h3>Stage 5: Frontend WebSocket Client (Render)</h3>
+            <p>
+              Dashboard opens WebSocket using current host, receives backend payload, updates live table and protocol logs
+              instantly without polling.
+            </p>
 <pre>function getWebSocketUrl() {
-  // Auto-switch ws / wss and use current host
   var scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return scheme + '://' + window.location.hostname + ':3000';
 }
 
-// Open persistent real-time channel
 ws = new WebSocket(getWebSocketUrl());
-
 ws.onmessage = function(event) {
-  // Parse backend payload and update UI rows
   var data = JSON.parse(event.data);
   updateTable(data);
+  addLogEntry('[MQTT -> WS] topic=' + (data.topic || 'n/a'));
 };</pre>
-
-      <p><b>3) contiki_client/run-contiki.sh</b> — Native Build + Run</p>
-      <p>
-        Contiki native example is patched and built at startup, then launched with TUN prefix/device.
-        This enables MQTT traffic from a native Contiki node inside Docker.
-      </p>
-<pre># Build Contiki native MQTT client
-CCACHE_DISABLE=1 make -C "${EXAMPLE_DIR}" TARGET=native clean all
-
-# Start native node with TUN device
-exec "${EXAMPLE_DIR}/build/native/mqtt-client.native" --prefix "${TUN_PREFIX}" -t "${TUN_DEV}"</pre>
+          </section>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -115,6 +155,8 @@ exec "${EXAMPLE_DIR}/build/native/mqtt-client.native" --prefix "${TUN_PREFIX}" -
     var MAX_TABLE_ROWS = 10;
     var ws;
     var messageCount = 0;
+    var codeStageIndex = 0;
+    var codeStageTotal = 5;
 
     function showTab(tabName) {
       document.getElementById('tab-demo').style.display = (tabName === 'demo') ? 'block' : 'none';
@@ -122,6 +164,10 @@ exec "${EXAMPLE_DIR}/build/native/mqtt-client.native" --prefix "${TUN_PREFIX}" -
 
       document.getElementById('btn-demo').style.fontWeight = (tabName === 'demo') ? 'bold' : 'normal';
       document.getElementById('btn-code').style.fontWeight = (tabName === 'code') ? 'bold' : 'normal';
+
+      if (tabName === 'code') {
+        renderCodeStage();
+      }
     }
 
     function addLogEntry(message) {
@@ -196,7 +242,23 @@ exec "${EXAMPLE_DIR}/build/native/mqtt-client.native" --prefix "${TUN_PREFIX}" -
       return value === null || value === undefined ? 'N/A' : value + '%';
     }
 
+    function renderCodeStage() {
+      var track = document.getElementById('code-stage-track');
+      var label = document.getElementById('code-stage-label');
+      if (!track || !label) return;
+      track.style.transform = 'translateX(-' + (codeStageIndex * 100) + '%)';
+      label.textContent = 'Stage ' + (codeStageIndex + 1) + ' / ' + codeStageTotal;
+    }
+
+    function moveCodeStage(step) {
+      codeStageIndex += step;
+      if (codeStageIndex < 0) codeStageIndex = 0;
+      if (codeStageIndex >= codeStageTotal) codeStageIndex = codeStageTotal - 1;
+      renderCodeStage();
+    }
+
     connectWebSocket();
+    renderCodeStage();
   </script>
 </body>
 </html>
