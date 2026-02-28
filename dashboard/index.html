@@ -1,514 +1,175 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IoT Presentation — WebSocket &amp; MQTT</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IoT Dashboard — Live Demo</title>
 </head>
-<body style="margin: 40px 80px; font-family: 'Times New Roman', Times, serif; height: calc(100vh - 80px); overflow: hidden;">
+<body style="margin: 24px; font-family: 'Times New Roman', Times, serif;">
+  <center>
+    <h1>IoT Dashboard</h1>
+    <p>Live Demo + Code Samples</p>
+    <p>Status: <b id="status-text">Disconnected</b></p>
+  </center>
 
-    <center>
-        <h1>Application Layer Protocols: WebSocket &amp; MQTT</h1>
-        <p>Internet of Things Programming — Live Demo &amp; Presentation</p>
-        <p>Status: <b id="status-text">Disconnected</b></p>
-    </center>
+  <hr>
 
-    <hr>
+  <table cellpadding="0" cellspacing="0">
+    <tr>
+      <td><button onclick="showTab('demo')" id="btn-demo" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer; font-weight: bold;">Live Demo</button></td>
+      <td><button onclick="showTab('code')" id="btn-code" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer;">Code Samples</button></td>
+    </tr>
+  </table>
 
-    <!-- TAB BUTTONS -->
-    <table cellpadding="0" cellspacing="0"><tr>
-        <td><button onclick="showTab('realtime')" id="btn-realtime" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer; font-weight: bold;">1. Why Real-Time?</button></td>
-        <td><button onclick="showTab('websocket')" id="btn-websocket" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer;">2. WebSocket</button></td>
-        <td><button onclick="showTab('mqtt')" id="btn-mqtt" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer;">3. MQTT</button></td>
-        <td><button onclick="showTab('components')" id="btn-components" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer;">4. Components</button></td>
-        <td><button onclick="showTab('contiki')" id="btn-contiki" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer;">5. Contiki</button></td>
-        <td><button onclick="showTab('demo')" id="btn-demo" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer;">6. Live Demo</button></td>
-        <td><button onclick="showTab('code')" id="btn-code" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer;">7. Code</button></td>
-    </tr></table>
+  <hr>
 
-    <hr>
+  <div id="tab-demo">
+    <h2>Live Demo</h2>
+    <p>Real-time data from Contiki MQTT stream via Backend WebSocket bridge.</p>
 
-    <!-- ========================================== -->
-    <!-- TAB 1: Why Real-Time? -->
-    <!-- ========================================== -->
-    <div id="tab-realtime">
-        <h2>The Problem: Why Do IoT Devices Need Real-Time Communication?</h2>
+    <table border="1" cellpadding="8" cellspacing="0" width="100%">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Temperature</th>
+          <th>Humidity</th>
+          <th>Device</th>
+        </tr>
+      </thead>
+      <tbody id="table-body">
+        <tr><td colspan="4" style="text-align:center;">Waiting for data...</td></tr>
+      </tbody>
+    </table>
 
-        <p>
-            IoT devices (sensors, actuators, embedded nodes) generate data continuously.
-            A temperature sensor reads every 2 seconds. A heart-rate monitor reads every 100ms.
-            <b>The data is only valuable if it arrives immediately.</b>
-        </p>
-
-        <p><b>Traditional HTTP Approach (Polling):</b></p>
-<pre>
-  Browser                          Server
-     |                                |
-     |--- GET /data ----------------->|     (request #1)
-     |<-- 200 OK {"temp": 24.3} -----|
-     |                                |
-     |   ... wait 2 seconds ...       |     (wasted time)
-     |                                |
-     |--- GET /data ----------------->|     (request #2)
-     |<-- 200 OK {"temp": 24.5} -----|
-     |                                |
-     |   ... wait 2 seconds ...       |     (wasted time, wasted bandwidth)
-     |                                |
-     |--- GET /data ----------------->|     (request #3 -- even if nothing changed!)
-     |<-- 200 OK {"temp": 24.5} -----|     (same data, wasted request)
+    <h3>Protocol Log</h3>
+    <pre id="live-log" style="height: 220px; overflow-y: auto; border: 1px solid #999; padding: 8px;">[--:--:--] Waiting for WebSocket connection...
 </pre>
+  </div>
 
-        <p><b>The Solution: Persistent Connections</b></p>
-        <ul>
-            <li><b>WebSocket</b> — persistent full-duplex connection between browser and server</li>
-            <li><b>MQTT</b> — lightweight publish-subscribe messaging for IoT devices</li>
-        </ul>
-        <p>
-            Both protocols solve the same core problem: <b>push data instantly when it's available</b>,
-            without the client having to ask repeatedly. They operate at the <b>Application Layer</b>
-            of the OSI model, on top of TCP.
-        </p>
-    </div>
+  <div id="tab-code" style="display:none;">
+    <h2>Code Samples</h2>
 
-    <!-- ========================================== -->
-    <!-- TAB 2: WebSocket -->
-    <!-- ========================================== -->
-    <div id="tab-websocket" style="display:none;">
-        <h2>WebSocket: How It Works</h2>
+    <p><b>backend/server.js</b> — MQTT Subscriber + WebSocket Bridge</p>
+<pre>// MQTT broker config
+const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://mosquitto:1883";
 
-        <p>
-            WebSocket (RFC 6455) provides <b>full-duplex communication</b> over a single TCP connection.
-            It starts as a regular HTTP request, then <b>upgrades</b> to a persistent connection.
-        </p>
-
-        <p><b>The WebSocket Handshake:</b></p>
-<pre>
-  Browser                                     Server
-     |                                           |
-     |--- HTTP GET / --------------------------->|
-     |   Headers:                                |
-     |     Upgrade: websocket                    |
-     |     Connection: Upgrade                   |
-     |     Sec-WebSocket-Key: dGhlIHN...         |
-     |                                           |
-     |<-- HTTP 101 Switching Protocols ----------|
-     |   Headers:                                |
-     |     Upgrade: websocket                    |
-     |     Connection: Upgrade                   |
-     |     Sec-WebSocket-Accept: s3pPL...        |
-     |                                           |
-     |========= CONNECTION UPGRADED =============|
-     |                                           |
-     |   (now full-duplex, both sides can        |
-     |    send data at any time)                 |
-     |                                           |
-     |<-- server pushes: {"temp": 24.3} --------|  (instant, no request needed)
-     |<-- server pushes: {"temp": 24.5} --------|  (instant, no request needed)
-     |<-- server pushes: {"temp": 25.1} --------|  (instant, no request needed)
-</pre>
-
-        <p><b>Key characteristics:</b></p>
-        <ul>
-            <li>Starts as HTTP, upgrades to WebSocket (port 80 or 443)</li>
-            <li>Full-duplex: both client and server can send messages at any time</li>
-            <li>Persistent: the connection stays open until explicitly closed</li>
-            <li>Low overhead: no HTTP headers on every message (just 2-6 byte frame header)</li>
-            <li>Ideal for: dashboards, chat, gaming, live feeds, IoT monitoring</li>
-        </ul>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB 3: MQTT -->
-    <!-- ========================================== -->
-    <div id="tab-mqtt" style="display:none;">
-        <h2>MQTT: Publish-Subscribe Model</h2>
-
-        <p>
-            MQTT (Message Queuing Telemetry Transport) is a <b>lightweight messaging protocol</b>
-            designed for constrained devices and low-bandwidth networks. It uses a
-            <b>publish-subscribe</b> pattern — fundamentally different from HTTP's request-response.
-        </p>
-
-        <p><b>How Publish-Subscribe Works:</b></p>
-<pre>
-                         +-------------------+
-                         |   MQTT BROKER     |
-   PUBLISHERS            |  (Mosquitto)      |            SUBSCRIBERS
-                         |                   |
-  [Sensor A] --publish-->| topic: room/temp  |--deliver--> [Dashboard]
-                         |                   |
-  [Sensor B] --publish-->| topic: room/humid |--deliver--> [Logger]
-                         |                   |
-                         | topic: outdoor/*  |--deliver--> [Mobile App]
-                         +-------------------+
-
-  * Publishers don't know who subscribes
-  * Subscribers don't know who publishes
-  * The Broker handles all routing
-  * This DECOUPLING is what makes MQTT ideal for IoT
-</pre>
-
-        <p><b>Why MQTT for IoT?</b></p>
-        <ul>
-            <li><b>Minimal overhead:</b> 2-byte fixed header (vs HTTP's ~700 bytes of headers)</li>
-            <li><b>Runs on TCP:</b> reliable delivery on port 1883 (or 8883 with TLS)</li>
-            <li><b>QoS levels:</b> 0 = at most once, 1 = at least once, 2 = exactly once</li>
-            <li><b>Retained messages:</b> broker stores last message per topic for new subscribers</li>
-            <li><b>Last Will &amp; Testament:</b> broker publishes a message if client disconnects unexpectedly</li>
-            <li><b>Designed for constrained devices:</b> works on microcontrollers with limited RAM/CPU</li>
-        </ul>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB 4: MQTT Components -->
-    <!-- ========================================== -->
-    <div id="tab-components" style="display:none;">
-        <h2>MQTT Components: Broker, Publisher, Subscriber</h2>
-
-        <table border="1" cellpadding="8" cellspacing="0" width="100%">
-            <tr>
-                <th width="20%">Component</th>
-                <th width="35%">Role</th>
-                <th width="45%">In Our Demo</th>
-            </tr>
-            <tr>
-                <td><b>Broker</b></td>
-                <td>Central message router. Receives all published messages and delivers them
-                    to matching subscribers. Manages connections, topics, QoS, and sessions.</td>
-                <td><b>Eclipse Mosquitto</b> — open-source MQTT broker running on port 1883.
-                    Handles topic matching and fan-out delivery.</td>
-            </tr>
-            <tr>
-                <td><b>Publisher</b></td>
-                <td>Sends messages to a specific topic on the broker.
-                    Does not know or care who is subscribed. Fire-and-forget.</td>
-                <td><b>Contiki-NG native node</b> — publishes JSON
-                    temperature/humidity data to <code>iot-2/evt/status/fmt/json</code> every 2 seconds.</td>
-            </tr>
-            <tr>
-                <td><b>Subscriber</b></td>
-                <td>Registers interest in one or more topics with the broker.
-                    Receives messages automatically when they are published to those topics.</td>
-                <td><b>Node.js backend</b> (server.js) — subscribes to
-                    <code>iot-2/evt/+/fmt/json</code> and bridges received data to WebSocket.</td>
-            </tr>
-        </table>
-
-        <p><b>What is Mosquitto?</b></p>
-        <p>
-            <b>Eclipse Mosquitto</b> is an open-source message broker that implements MQTT protocol
-            versions 5.0, 3.1.1, and 3.1. It is lightweight, suitable for all devices from
-            low-power single board computers to full servers. It is maintained by the Eclipse Foundation.
-        </p>
-<pre>
-Mosquitto Features:
-  - Written in C, extremely lightweight (~120KB binary)
-  - Supports MQTT v3.1, v3.1.1, and v5.0
-  - TLS/SSL encryption support
-  - WebSocket support (browsers can connect directly)
-  - Bridge mode (connect multiple brokers)
-  - Plugin authentication system
-  - Runs on Linux, macOS, Windows, Raspberry Pi
-</pre>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB 5: Contiki -->
-    <!-- ========================================== -->
-    <div id="tab-contiki" style="display:none;">
-        <h2>MQTT on Contiki-NG</h2>
-
-        <p>
-            <b>Contiki-NG</b> is an open-source OS for resource-constrained IoT devices
-            (microcontrollers with ~10KB RAM). It includes a native MQTT client that
-            allows sensor nodes to publish data directly to an MQTT broker.
-        </p>
-
-        <p><b>Real-World Architecture: Contiki Node as MQTT Publisher</b></p>
-<pre>
-  +------------------+         +------------------+         +------------------+
-  |  Contiki Node    |  MQTT   |  Mosquitto       |  MQTT   |  Application     |
-  |  (Sensor)        |-------->|  Broker           |-------->|  Server          |
-  |                  |  :1883  |                  |         |                  |
-  |  - Temperature   |         |  Routes messages |         |  - Stores data   |
-  |  - Humidity      |         |  to subscribers  |         |  - Dashboard     |
-  |  - Light level   |         |                  |         |  - Alerts        |
-  +------------------+         +------------------+         +------------------+
-     ^                                                           |
-     |  Contiki MQTT Client                                      |  WebSocket
-     |  - mqtt_connect()                                         |  to browser
-     |  - mqtt_publish()                                         v
-     |  - mqtt_subscribe()                                  [Web Dashboard]
-     |
-  Runs on: CC2538, CC2650, Zolertia, nRF52840, etc.
-</pre>
-
-        <p><b>Contiki MQTT Client API:</b></p>
-<pre>
-// Contiki-NG MQTT client example (C language)
-#include "mqtt.h"
-
-static struct mqtt_connection conn;
-
-// Connect to broker
-mqtt_connect(&conn, "192.168.1.100", 1883, 60);  // broker IP, port, keepalive
-
-// Publish sensor reading
-char payload[64];
-snprintf(payload, sizeof(payload),
-    "{\"temperature\": %.1f}", get_temperature());
-
-mqtt_publish(&conn,
-    NULL,                          // request state
-    "iot-2/evt/status/fmt/json",   // topic
-    (uint8_t *)payload,            // payload
-    strlen(payload),               // payload length
-    MQTT_QOS_LEVEL_1,              // QoS 1: at least once
-    MQTT_RETAIN_OFF);              // don't retain
-</pre>
-
-        <p><b>Our Demo:</b></p>
-        <p>
-            In this demo, a real <b>Contiki-NG native MQTT client</b> publishes telemetry.
-            The backend subscribes to Contiki topics and forwards data to the browser using WebSocket.
-        </p>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB 6: Live Demo -->
-    <!-- ========================================== -->
-    <div id="tab-demo" style="display:none;">
-        <h2>Live Demo: Real-Time Data Flow</h2>
-
-        <p><b>Architecture of this demo:</b></p>
-<pre>
-[Contiki-NG Native Node] --MQTT--> [Mosquitto :1883] --MQTT--> [Node.js Backend] --WS :3000--> [This Browser]
-   Publisher                    Broker                    Subscriber+Bridge                Dashboard
-</pre>
-
-        <table border="1" cellpadding="6" cellspacing="0" width="100%">
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Temperature</th>
-                    <th>Humidity</th>
-                    <th>Device</th>
-                </tr>
-            </thead>
-            <tbody id="table-body">
-                <tr><td colspan="4" align="center"><i>Waiting for data...</i></td></tr>
-            </tbody>
-        </table>
-
-        <br>
-        <p><b>Live Protocol Log:</b></p>
-        <pre id="live-log" style="height: 180px; overflow-y: auto;">[--:--:--] Waiting for WebSocket connection...
-</pre>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TAB 7: Code -->
-    <!-- ========================================== -->
-    <div id="tab-code" style="display:none;">
-        <h2>Source Code</h2>
-
-        <p>Select a component:
-            <button onclick="showCode('contiki')" id="btn-code-contiki" style="font-family: inherit; cursor: pointer; font-weight: bold;">Contiki (C)</button>
-            <button onclick="showCode('backend')" id="btn-code-backend" style="font-family: inherit; cursor: pointer;">Backend (Node.js)</button>
-            <button onclick="showCode('browser')" id="btn-code-browser" style="font-family: inherit; cursor: pointer;">Browser (JavaScript)</button>
-        </p>
-
-        <div id="code-contiki">
-            <p><b>Contiki mqtt-client.c (runtime patched)</b> — MQTT Publisher</p>
-<pre>
-/* Publish JSON with temperature/humidity every 2 seconds */
-len = snprintf(buf_ptr, remaining,
-               ",\"temperature\":%d,\"humidity\":%d,\"device_id\":\"contiki-01\"}}",
-               temperature, humidity);
-
-mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer,
-             strlen(app_buffer), MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF);
-</pre>
-        </div>
-
-        <div id="code-backend" style="display:none;">
-            <p><b>backend/server.js</b> — MQTT Subscriber + WebSocket Server (Bridge)</p>
-<pre>
-const mqtt = require("mqtt");
-const { WebSocketServer } = require("ws");
-
-// Connect to Mosquitto broker as MQTT subscriber
-const mqttClient = mqtt.connect("mqtt://localhost:1883");
+// Subscribe to Contiki topic
 mqttClient.subscribe("iot-2/evt/+/fmt/json");
 
-// Create WebSocket server for browser clients
-const wss = new WebSocketServer({ port: 3000 });
+// Broadcast incoming MQTT payload to all WS clients
+wss.clients.forEach((client) =&gt; {
+  if (client.readyState === 1) {
+    client.send(JSON.stringify(payload));
+  }
+});</pre>
 
-// Bridge: MQTT message arrives -> broadcast to all WebSocket clients
-mqttClient.on("message", (topic, message) => {
-    const payload = message.toString();
+    <p><b>dashboard/index.html</b> — WebSocket Client</p>
+<pre>function getWebSocketUrl() {
+  var scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return scheme + '://' + window.location.hostname + ':3000';
+}
 
-    wss.clients.forEach((client) => {
-        if (client.readyState === client.OPEN) {
-            client.send(payload);  // push to browser instantly
-        }
-    });
-});
-</pre>
-        </div>
+ws = new WebSocket(getWebSocketUrl());
 
-        <div id="code-browser" style="display:none;">
-            <p><b>dashboard/index.html</b> — WebSocket Client (This Page)</p>
-<pre>
-// Open persistent WebSocket connection (HTTP -> 101 Upgrade)
-const ws = new WebSocket('ws://localhost:3000');
+ws.onmessage = function(event) {
+  var data = JSON.parse(event.data);
+  updateTable(data);
+};</pre>
 
-// Connection established — full-duplex channel is now open
-ws.onopen = () => {
-    console.log('WebSocket connected!');
-};
+    <p><b>contiki_client/run-contiki.sh</b> — Native Build + Run</p>
+<pre># Build Contiki native MQTT client
+CCACHE_DISABLE=1 make -C "${EXAMPLE_DIR}" TARGET=native clean all
 
-// Server PUSHES data the instant it arrives from MQTT
-// No polling, no repeated requests — just real-time push
-ws.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    // data = { temperature: 24.3, humidity: 55.1, timestamp: "...", device_id: "contiki-01" }
-    updateTable(data);
-};
+# Start native node with TUN device
+exec "${EXAMPLE_DIR}/build/native/mqtt-client.native" --prefix "${TUN_PREFIX}" -t "${TUN_DEV}"</pre>
+  </div>
 
-// Auto-reconnect if connection drops
-ws.onclose = () => {
-    setTimeout(connectWebSocket, 3000);
-};
-</pre>
-        </div>
-    </div>
+  <script>
+    var MAX_TABLE_ROWS = 10;
+    var ws;
+    var messageCount = 0;
 
-    <hr>
-    <center><small>IoT Programming — WebSocket &amp; MQTT Presentation</small></center>
+    function showTab(tabName) {
+      document.getElementById('tab-demo').style.display = (tabName === 'demo') ? 'block' : 'none';
+      document.getElementById('tab-code').style.display = (tabName === 'code') ? 'block' : 'none';
 
-    <script>
-        // --- Tab Navigation ---
-        var tabs = ['realtime', 'websocket', 'mqtt', 'components', 'contiki', 'demo', 'code'];
+      document.getElementById('btn-demo').style.fontWeight = (tabName === 'demo') ? 'bold' : 'normal';
+      document.getElementById('btn-code').style.fontWeight = (tabName === 'code') ? 'bold' : 'normal';
+    }
 
-        function showTab(name) {
-            for (var i = 0; i < tabs.length; i++) {
-                document.getElementById('tab-' + tabs[i]).style.display = 'none';
-                document.getElementById('btn-' + tabs[i]).style.fontWeight = 'normal';
-            }
-            document.getElementById('tab-' + name).style.display = 'block';
-            document.getElementById('btn-' + name).style.fontWeight = 'bold';
-        }
+    function addLogEntry(message) {
+      var log = document.getElementById('live-log');
+      if (!log) return;
+      var time = new Date().toLocaleTimeString();
+      log.textContent += '[' + time + '] ' + message + '\n';
+      log.scrollTop = log.scrollHeight;
+      var lines = log.textContent.split('\n');
+      if (lines.length > 80) {
+        log.textContent = lines.slice(lines.length - 80).join('\n');
+      }
+    }
 
-        // --- Code Sub-tabs ---
-        var codeTabs = ['contiki', 'backend', 'browser'];
+    function getWebSocketUrl() {
+      var scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      return scheme + '://' + window.location.hostname + ':3000';
+    }
 
-        function showCode(name) {
-            for (var i = 0; i < codeTabs.length; i++) {
-                document.getElementById('code-' + codeTabs[i]).style.display = 'none';
-                document.getElementById('btn-code-' + codeTabs[i]).style.fontWeight = 'normal';
-            }
-            document.getElementById('code-' + name).style.display = 'block';
-            document.getElementById('btn-code-' + name).style.fontWeight = 'bold';
-        }
+    function connectWebSocket() {
+      ws = new WebSocket(getWebSocketUrl());
 
-        // --- Keyboard Navigation (left/right arrows to switch tabs) ---
-        document.addEventListener('keydown', function(e) {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-            var current = -1;
-            for (var i = 0; i < tabs.length; i++) {
-                if (document.getElementById('tab-' + tabs[i]).style.display !== 'none') {
-                    current = i;
-                    break;
-                }
-            }
-            if (e.key === 'ArrowRight' && current < tabs.length - 1) {
-                showTab(tabs[current + 1]);
-            } else if (e.key === 'ArrowLeft' && current > 0) {
-                showTab(tabs[current - 1]);
-            }
-        });
+      ws.onopen = function() {
+        document.getElementById('status-text').textContent = 'Connected';
+        addLogEntry('[WebSocket] Connection OPEN');
+      };
 
-        // --- WebSocket + Live Demo ---
-        var MAX_TABLE_ROWS = 10;
-        var ws;
-        var messageCount = 0;
+      ws.onmessage = function(event) {
+        var data = JSON.parse(event.data);
+        messageCount++;
+        addLogEntry('[MQTT -> WS] #' + messageCount + ' topic=' + (data.topic || 'n/a'));
+        updateTable(data);
+      };
 
-        function addLogEntry(message) {
-            var log = document.getElementById('live-log');
-            if (!log) return;
-            var time = new Date().toLocaleTimeString();
-            log.textContent += '[' + time + '] ' + message + '\n';
-            log.scrollTop = log.scrollHeight;
-            var lines = log.textContent.split('\n');
-            if (lines.length > 50) {
-                log.textContent = lines.slice(lines.length - 50).join('\n');
-            }
-        }
+      ws.onclose = function() {
+        document.getElementById('status-text').textContent = 'Disconnected';
+        addLogEntry('[WebSocket] Connection CLOSED — reconnecting in 3s...');
+        setTimeout(connectWebSocket, 3000);
+      };
 
-        function getWebSocketUrl() {
-            var scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-            return scheme + '://' + window.location.hostname + ':3000';
-        }
+      ws.onerror = function() {
+        addLogEntry('[WebSocket] ERROR');
+        ws.close();
+      };
+    }
 
-        function connectWebSocket() {
-            ws = new WebSocket(getWebSocketUrl());
+    function updateTable(data) {
+      var tbody = document.getElementById('table-body');
+      if (!tbody) return;
+      var time = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : '--:--:--';
 
-            ws.onopen = function() {
-                document.getElementById('status-text').textContent = 'Connected';
-                addLogEntry('[WebSocket] Connection OPEN — HTTP upgraded to WebSocket (101 Switching Protocols)');
-            };
+      if (tbody.rows.length === 1 && tbody.rows[0].cells.length === 1) {
+        tbody.innerHTML = '';
+      }
 
-            ws.onmessage = function(event) {
-                var data = JSON.parse(event.data);
-                messageCount++;
-                addLogEntry('[MQTT -> Broker] Source: ' + (data.source || 'unknown') + ', topic: ' + (data.topic || 'n/a'));
-                addLogEntry('[Broker -> Backend] #' + messageCount + ': ' + formatTemperature(data.temperature) + ', ' + formatHumidity(data.humidity));
-                addLogEntry('[Backend -> Browser] WebSocket push delivered');
-                updateTable(data);
-            };
+      var row = tbody.insertRow(0);
+      row.innerHTML = '<td>' + time + '</td>' +
+        '<td>' + formatTemperature(data.temperature) + '</td>' +
+        '<td>' + formatHumidity(data.humidity) + '</td>' +
+        '<td>' + (data.device_id || 'unknown') + '</td>';
 
-            ws.onclose = function() {
-                document.getElementById('status-text').textContent = 'Disconnected';
-                addLogEntry('[WebSocket] Connection CLOSED — reconnecting in 3s...');
-                setTimeout(connectWebSocket, 3000);
-            };
+      while (tbody.rows.length > MAX_TABLE_ROWS) {
+        tbody.deleteRow(tbody.rows.length - 1);
+      }
+    }
 
-            ws.onerror = function() {
-                addLogEntry('[WebSocket] ERROR — connection failed');
-                ws.close();
-            };
-        }
+    function formatTemperature(value) {
+      return value === null || value === undefined ? 'N/A' : value + ' C';
+    }
 
-        function updateTable(data) {
-            var tbody = document.getElementById('table-body');
-            if (!tbody) return;
-            var time = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : '--:--:--';
+    function formatHumidity(value) {
+      return value === null || value === undefined ? 'N/A' : value + '%';
+    }
 
-            if (tbody.rows.length === 1 && tbody.rows[0].cells.length === 1) {
-                tbody.innerHTML = '';
-            }
-
-            var row = tbody.insertRow(0);
-            row.innerHTML = '<td>' + time + '</td>' +
-                '<td>' + formatTemperature(data.temperature) + '</td>' +
-                '<td>' + formatHumidity(data.humidity) + '</td>' +
-                '<td>' + (data.device_id || 'unknown') + '</td>';
-
-            while (tbody.rows.length > MAX_TABLE_ROWS) {
-                tbody.deleteRow(tbody.rows.length - 1);
-            }
-        }
-
-        function formatTemperature(value) {
-            return value === null || value === undefined ? 'N/A' : value + ' C';
-        }
-
-        function formatHumidity(value) {
-            return value === null || value === undefined ? 'N/A' : value + '%';
-        }
-
-        connectWebSocket();
-    </script>
+    connectWebSocket();
+  </script>
 </body>
 </html>
