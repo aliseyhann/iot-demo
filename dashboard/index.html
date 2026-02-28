@@ -27,61 +27,88 @@
     <h2>Live Demo</h2>
     <p>Real-time data from Contiki MQTT stream via Backend WebSocket bridge.</p>
 
-    <table border="1" cellpadding="8" cellspacing="0" width="100%">
-      <thead>
-        <tr>
-          <th>Time</th>
-          <th>Temperature</th>
-          <th>Humidity</th>
-          <th>Device</th>
-        </tr>
-      </thead>
-      <tbody id="table-body">
-        <tr><td colspan="4" style="text-align:center;">Waiting for data...</td></tr>
-      </tbody>
-    </table>
+    <div style="display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
+      <div style="flex: 1 1 520px; min-width: 320px;">
+        <h3 style="margin-top: 0;">Real-Time Data</h3>
+        <table border="1" cellpadding="8" cellspacing="0" width="100%">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Temperature</th>
+              <th>Humidity</th>
+              <th>Device</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <tr><td colspan="4" style="text-align:center;">Waiting for data...</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-    <h3>Protocol Log</h3>
-    <pre id="live-log" style="height: 220px; overflow-y: auto; border: 1px solid #999; padding: 8px;">[--:--:--] Waiting for WebSocket connection...
+      <div style="flex: 1 1 420px; min-width: 320px;">
+        <h3 style="margin-top: 0;">Protocol Logs</h3>
+        <pre id="live-log" style="height: 300px; overflow-y: auto; border: 1px solid #999; padding: 8px; margin: 0;">[--:--:--] Waiting for WebSocket connection...
 </pre>
+      </div>
+    </div>
   </div>
 
   <div id="tab-code" style="display:none;">
-    <h2>Code Samples</h2>
+    <div style="max-width: 980px; margin: 0 auto;">
+      <h2 style="text-align: center;">Code Samples</h2>
+      <p style="text-align: center;">
+        This section shows the exact bridge flow from Contiki MQTT messages to browser updates.
+      </p>
 
-    <p><b>backend/server.js</b> — MQTT Subscriber + WebSocket Bridge</p>
-<pre>// MQTT broker config
+      <p><b>1) backend/server.js</b> — MQTT Subscriber + WebSocket Bridge</p>
+      <p>
+        Backend subscribes to the Contiki topic, normalizes payload fields, then pushes JSON to all connected
+        WebSocket clients. This is the central real-time bridge.
+      </p>
+<pre>// 1) Read broker address from env (default: local compose broker)
 const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://mosquitto:1883";
 
-// Subscribe to Contiki topic
+// 2) Subscribe to Contiki event topic pattern
 mqttClient.subscribe("iot-2/evt/+/fmt/json");
 
-// Broadcast incoming MQTT payload to all WS clients
+// 3) On every MQTT message, broadcast normalized payload to all WS clients
 wss.clients.forEach((client) =&gt; {
   if (client.readyState === 1) {
     client.send(JSON.stringify(payload));
   }
 });</pre>
 
-    <p><b>dashboard/index.html</b> — WebSocket Client</p>
+      <p><b>2) dashboard/index.html</b> — WebSocket Client</p>
+      <p>
+        Frontend builds the WebSocket URL from the current hostname, so the same page works on localhost and VPS.
+        Incoming data is parsed and inserted into the live table.
+      </p>
 <pre>function getWebSocketUrl() {
+  // Auto-switch ws / wss and use current host
   var scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return scheme + '://' + window.location.hostname + ':3000';
 }
 
+// Open persistent real-time channel
 ws = new WebSocket(getWebSocketUrl());
 
 ws.onmessage = function(event) {
+  // Parse backend payload and update UI rows
   var data = JSON.parse(event.data);
   updateTable(data);
 };</pre>
 
-    <p><b>contiki_client/run-contiki.sh</b> — Native Build + Run</p>
+      <p><b>3) contiki_client/run-contiki.sh</b> — Native Build + Run</p>
+      <p>
+        Contiki native example is patched and built at startup, then launched with TUN prefix/device.
+        This enables MQTT traffic from a native Contiki node inside Docker.
+      </p>
 <pre># Build Contiki native MQTT client
 CCACHE_DISABLE=1 make -C "${EXAMPLE_DIR}" TARGET=native clean all
 
 # Start native node with TUN device
 exec "${EXAMPLE_DIR}/build/native/mqtt-client.native" --prefix "${TUN_PREFIX}" -t "${TUN_DEV}"</pre>
+    </div>
   </div>
 
   <script>
