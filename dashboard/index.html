@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IoT Dashboard — Live Demo</title>
+  <title>dashboard</title>
 </head>
 <body style="margin: 24px; font-family: 'Times New Roman', Times, serif;">
-  <center>
-    <h1>IoT Dashboard</h1>
-    <p>Live Demo + Code Samples</p>
+  <right>
+    <h1>Application layer protocols: WEBSOCKET and MQTT</h1>
+  </right>
+  <left>
     <p>Status: <b id="status-text">Disconnected</b></p>
-  </center>
+  </left>
 
   <hr>
 
@@ -20,8 +21,6 @@
       <td><button onclick="showTab('code')" id="btn-code" style="padding: 6px 16px; font-family: inherit; font-size: 14px; cursor: pointer;">Code Samples</button></td>
     </tr>
   </table>
-
-  <hr>
 
   <div id="tab-demo">
     <h2>Live Demo</h2>
@@ -55,18 +54,15 @@
 
   <div id="tab-code" style="display:none;">
     <div style="max-width: 1100px; margin: 0 auto;">
-      <h2 style="text-align: center;">Code Samples</h2>
       <p style="text-align: center;">
         Full end-to-end flow: <b>Contiki Node -> MQTT Broker -> Backend -> WebSocket -> Frontend UI</b>
       </p>
 
-      <div style="display: flex; justify-content: center; gap: 8px; margin: 12px 0;">
-        <button onclick="moveCodeStage(-1)" style="padding: 6px 14px; font-family: inherit; cursor: pointer;">&larr; Prev</button>
-        <span id="code-stage-label" style="display: inline-block; min-width: 230px; text-align: center; line-height: 30px; border: 1px solid #999; padding: 0 8px;">Stage 1 / 5</span>
-        <button onclick="moveCodeStage(1)" style="padding: 6px 14px; font-family: inherit; cursor: pointer;">Next &rarr;</button>
+      <div style="text-align: center; margin: 12px 0;">
+        <span id="code-stage-label" style="display: inline-block; min-width: 230px;">Stage 1 / 5</span>
       </div>
 
-      <div style="overflow: hidden; border: 1px solid #999; padding: 12px;">
+      <div style="overflow: hidden; padding: 12px;">
         <div id="code-stage-track" style="display: flex; width: 100%; transition: transform 0.3s ease;">
           <section style="flex: 0 0 100%; box-sizing: border-box; padding: 4px 8px;">
             <h3>Stage 1: Contiki Native Node (Data Producer)</h3>
@@ -256,6 +252,15 @@ ws.onmessage = function(event) {
       if (codeStageIndex >= codeStageTotal) codeStageIndex = codeStageTotal - 1;
       renderCodeStage();
     }
+
+    document.addEventListener('keydown', function(event) {
+      if (document.getElementById('tab-code').style.display !== 'block') return;
+      if (event.key === 'ArrowLeft') {
+        moveCodeStage(-1);
+      } else if (event.key === 'ArrowRight') {
+        moveCodeStage(1);
+      }
+    });
 
     connectWebSocket();
     renderCodeStage();
