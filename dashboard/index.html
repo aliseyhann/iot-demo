@@ -67,16 +67,34 @@
           <section style="flex: 0 0 100%; box-sizing: border-box; padding: 4px 8px;">
             <h3>Stage 1: Contiki Native Node (Data Producer)</h3>
             <p>
-              Contiki native process runs in Docker with TUN interface and publishes telemetry every 2 seconds to
+              Custom Contiki client runs in Docker with TUN interface and publishes contracted telemetry every 2 seconds to
               <code>iot-2/evt/status/fmt/json</code>.
             </p>
-<pre># run-contiki.sh (startup path)
-CCACHE_DISABLE=1 make -C "${EXAMPLE_DIR}" TARGET=native clean all
-exec "${EXAMPLE_DIR}/build/native/mqtt-client.native" --prefix "${TUN_PREFIX}" -t "${TUN_DEV}"
+<pre>// Memory model (static buffers, no heap alloc)
+#define APP_BUFFER_SIZE 512
+static struct mqtt_connection conn;
+static char app_buffer[APP_BUFFER_SIZE];
 
-// mqtt-client.c (publish intent)
-mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer,
-             strlen(app_buffer), MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF);</pre>
+// 1) Register MQTT callbacks (protocol integration point)
+mqtt_register(&conn, &mqtt_client_process, client_id, mqtt_event, MAX_TCP_SEGMENT_SIZE);
+
+// 2) Open MQTT over TCP socket (broker:1883)
+mqtt_connect(&conn, conf.broker_ip, conf.broker_port,
+             (conf.pub_interval * 3) / CLOCK_SECOND, MQTT_CLEAN_SESSION_ON);
+
+// 3) Build payload safely with bounded snprintf + publish
+len = snprintf(app_buffer, APP_BUFFER_SIZE,
+               "{\"d\":{\"device_id\":\"contiki-01\",\"source\":\"contiki-ng-native\","
+               "\"sequence\":%u,\"uptime_sec\":%lu,\"temperature\":%d,\"humidity\":%d}}",
+               seq_nr_value, (unsigned long)clock_seconds(), temperature, humidity);
+
+if(len > 0 && len < APP_BUFFER_SIZE) {
+  mqtt_publish(&conn, NULL, pub_topic, (uint8_t *)app_buffer,
+               strlen(app_buffer), MQTT_QOS_LEVEL_0, MQTT_RETAIN_OFF);
+}
+
+// TCP/MQTT socket events are consumed in mqtt_event(...)
+// e.g. MQTT_EVENT_CONNECTED, MQTT_EVENT_DISCONNECTED, MQTT_EVENT_PUBLISH</pre>
           </section>
 
           <section style="flex: 0 0 100%; box-sizing: border-box; padding: 4px 8px;">
@@ -98,13 +116,13 @@ New client connected ... as d:quickstart:mqtt-client:010203060708</pre>
           <section style="flex: 0 0 100%; box-sizing: border-box; padding: 4px 8px;">
             <h3>Stage 3: Backend MQTT Subscriber (Normalization)</h3>
             <p>
-              Node backend subscribes to Contiki topic, parses payload, derives normalized fields
+              Node backend subscribes to Contiki topic, validates required contract fields
               (<code>temperature</code>, <code>humidity</code>, <code>device_id</code>) and prepares one unified JSON.
             </p>
 <pre>const MQTT_BROKER = process.env.MQTT_BROKER || "mqtt://mosquitto:1883";
 mqttClient.subscribe("iot-2/evt/+/fmt/json");
 
-// on message -> normalize
+// on message -> validate + normalize
 const payload = normalizePayload(topic, message.toString());</pre>
           </section>
 
