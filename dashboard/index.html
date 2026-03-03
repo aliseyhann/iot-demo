@@ -46,7 +46,7 @@
 
       <div style="flex: 1 1 420px; min-width: 320px;">
         <h3 style="margin-top: 0;">Protocol Logs</h3>
-        <pre id="live-log" style="height: 300px; overflow-y: auto; border: 1px solid #999; padding: 8px; margin: 0;">[--:--:--] Waiting for WebSocket connection...
+        <pre id="live-log" style="height: 300px; overflow-y: auto; border: 1px solid #999; padding: 8px; margin: 0; background: #111; color: #d7ffd7;">[--:--:--] dashboard-1       | Waiting for WebSocket connection...
 </pre>
       </div>
     </div>
@@ -185,14 +185,19 @@ ws.onmessage = function(event) {
     }
 
     function addLogEntry(message) {
+      appendServiceLog('dashboard-1', message);
+    }
+
+    function appendServiceLog(service, message) {
       var log = document.getElementById('live-log');
       if (!log) return;
       var time = new Date().toLocaleTimeString();
-      log.textContent += '[' + time + '] ' + message + '\n';
+      var paddedService = (service + '                ').slice(0, 16);
+      log.textContent += '[' + time + '] ' + paddedService + ' | ' + message + '\n';
       log.scrollTop = log.scrollHeight;
       var lines = log.textContent.split('\n');
-      if (lines.length > 80) {
-        log.textContent = lines.slice(lines.length - 80).join('\n');
+      if (lines.length > 200) {
+        log.textContent = lines.slice(lines.length - 200).join('\n');
       }
     }
 
@@ -206,24 +211,35 @@ ws.onmessage = function(event) {
 
       ws.onopen = function() {
         document.getElementById('status-text').textContent = 'Connected';
-        addLogEntry('[WebSocket] Connection OPEN');
+        appendServiceLog('dashboard-1', '[WebSocket] Connection OPEN');
+        appendServiceLog('backend-1', '[WebSocket] Yeni istemci bağlandı (dashboard)');
       };
 
       ws.onmessage = function(event) {
         var data = JSON.parse(event.data);
         messageCount++;
-        addLogEntry('[MQTT -> WS] #' + messageCount + ' topic=' + (data.topic || 'n/a'));
+        appendServiceLog('backend-1', '[MQTT -> WS] #' + messageCount + ' topic=' + (data.topic || 'n/a') + ' payload=' + event.data);
+        appendServiceLog('mosquitto-1', 'Routed topic=' + (data.topic || 'n/a') + ' to backend subscriber');
+
+        if (data.raw && data.raw.d) {
+          var seq = data.raw.d.sequence !== undefined ? data.raw.d.sequence : 'n/a';
+          appendServiceLog(
+            'contiki-sensor-1',
+            '[PUBLISH] seq=' + seq + ' temp=' + formatTemperature(data.temperature) + ' hum=' + formatHumidity(data.humidity) + ' device=' + (data.device_id || 'unknown')
+          );
+        }
+
         updateTable(data);
       };
 
       ws.onclose = function() {
         document.getElementById('status-text').textContent = 'Disconnected';
-        addLogEntry('[WebSocket] Connection CLOSED — reconnecting in 3s...');
+        appendServiceLog('dashboard-1', '[WebSocket] Connection CLOSED - reconnecting in 3s...');
         setTimeout(connectWebSocket, 3000);
       };
 
       ws.onerror = function() {
-        addLogEntry('[WebSocket] ERROR');
+        appendServiceLog('dashboard-1', '[WebSocket] ERROR');
         ws.close();
       };
     }
